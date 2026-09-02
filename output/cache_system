@@ -1,0 +1,314 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define TABLE_SIZE 10
+#define CACHE_SIZE 5
+
+typedef struct Product {
+    int id;
+    char name[50];
+    char category[30];
+    float price;
+    int lastUsed;
+    struct Product *next;
+} Product;
+
+Product *hashTable[TABLE_SIZE];
+
+int cacheCount = 0;
+int cacheHits = 0;
+int cacheMisses = 0;
+int timeCounter = 0;
+
+/* Hash Function */
+int hashFunction(int id) {
+    return id % TABLE_SIZE;
+}
+
+/* Create Product */
+Product* createProduct(int id, char name[], char category[], float price) {
+    Product *newProduct;
+
+    newProduct = (Product *)malloc(sizeof(Product));
+
+    newProduct->id = id;
+    strcpy(newProduct->name, name);
+    strcpy(newProduct->category, category);
+    newProduct->price = price;
+
+    newProduct->lastUsed = ++timeCounter;
+    newProduct->next = NULL;
+
+    return newProduct;
+}
+
+/* Search Product */
+Product* searchProduct(int id) {
+    int index = hashFunction(id);
+
+    Product *temp = hashTable[index];
+
+    while (temp != NULL) {
+
+        if (temp->id == id) {
+            cacheHits++;
+
+            temp->lastUsed = ++timeCounter;
+
+            printf("\nCache Hit!\n");
+            return temp;
+        }
+
+        temp = temp->next;
+    }
+
+    cacheMisses++;
+
+    printf("\nCache Miss!\n");
+
+    return NULL;
+}
+
+/* Remove Least Recently Used Product */
+void removeLRU() {
+
+    Product *lru = NULL;
+    Product *lruPrev = NULL;
+
+    int lruIndex = -1;
+
+    int minTime = 999999;
+
+    for (int i = 0; i < TABLE_SIZE; i++) {
+
+        Product *temp = hashTable[i];
+        Product *prev = NULL;
+
+        while (temp != NULL) {
+
+            if (temp->lastUsed < minTime) {
+
+                minTime = temp->lastUsed;
+
+                lru = temp;
+                lruPrev = prev;
+                lruIndex = i;
+            }
+
+            prev = temp;
+            temp = temp->next;
+        }
+    }
+
+    if (lru != NULL) {
+
+        if (lruPrev == NULL) {
+            hashTable[lruIndex] = lru->next;
+        }
+        else {
+            lruPrev->next = lru->next;
+        }
+
+        printf("\nCache Full!");
+        printf("\nLRU Product Removed: %d - %s\n",
+               lru->id, lru->name);
+
+        free(lru);
+
+        cacheCount--;
+    }
+}
+
+/* Insert Product */
+void insertProduct(int id, char name[], char category[], float price) {
+
+    int index = hashFunction(id);
+
+    Product *temp = hashTable[index];
+
+    /* Check Duplicate */
+    while (temp != NULL) {
+
+        if (temp->id == id) {
+
+            printf("\nProduct ID already exists!\n");
+            return;
+        }
+
+        temp = temp->next;
+    }
+
+    /* Remove LRU if Cache is Full */
+    if (cacheCount >= CACHE_SIZE) {
+        removeLRU();
+    }
+
+    Product *newProduct =
+        createProduct(id, name, category, price);
+
+    /* Separate Chaining */
+    newProduct->next = hashTable[index];
+
+    hashTable[index] = newProduct;
+
+    cacheCount++;
+
+    printf("\nProduct inserted successfully!");
+    printf("\nHash Index: %d\n", index);
+}
+
+/* Display Product */
+void displayProduct(Product *p) {
+
+    if (p == NULL) {
+        printf("\nProduct not found!\n");
+        return;
+    }
+
+    printf("\n--- Product Details ---\n");
+
+    printf("ID       : %d\n", p->id);
+    printf("Name     : %s\n", p->name);
+    printf("Category : %s\n", p->category);
+    printf("Price    : %.2f\n", p->price);
+}
+
+/* Display Cache */
+void displayCache() {
+
+    printf("\n\n===== HASH CACHE =====\n");
+
+    for (int i = 0; i < TABLE_SIZE; i++) {
+
+        printf("\nIndex %d : ", i);
+
+        Product *temp = hashTable[i];
+
+        while (temp != NULL) {
+
+            printf("[%d - %s] -> ",
+                   temp->id, temp->name);
+
+            temp = temp->next;
+        }
+
+        printf("NULL");
+    }
+
+    printf("\n");
+}
+
+/* Display Statistics */
+void displayStatistics() {
+
+    int totalRequests = cacheHits + cacheMisses;
+
+    printf("\n\n===== CACHE STATISTICS =====\n");
+
+    printf("Cache Hits   : %d\n", cacheHits);
+    printf("Cache Misses : %d\n", cacheMisses);
+
+    if (totalRequests > 0) {
+
+        float hitRate =
+            ((float)cacheHits / totalRequests) * 100;
+
+        printf("Cache Hit Rate: %.2f%%\n",
+               hitRate);
+    }
+}
+
+/* Main Function */
+int main() {
+
+    int choice;
+    int id;
+
+    char name[50];
+    char category[30];
+
+    float price;
+
+    Product *result;
+
+    do {
+
+        printf("\n\n==============================");
+        printf("\n E-COMMERCE HASH CACHE SYSTEM");
+        printf("\n==============================");
+
+        printf("\n1. Insert Product");
+        printf("\n2. Search Product");
+        printf("\n3. Display Cache");
+        printf("\n4. Display Statistics");
+        printf("\n5. Exit");
+
+        printf("\n\nEnter your choice: ");
+
+        scanf("%d", &choice);
+
+        switch (choice) {
+
+            case 1:
+
+                printf("\nEnter Product ID: ");
+                scanf("%d", &id);
+
+                printf("Enter Product Name: ");
+                scanf("%s", name);
+
+                printf("Enter Category: ");
+                scanf("%s", category);
+
+                printf("Enter Price: ");
+                scanf("%f", &price);
+
+                insertProduct(
+                    id,
+                    name,
+                    category,
+                    price
+                );
+
+                break;
+
+            case 2:
+
+                printf("\nEnter Product ID to Search: ");
+
+                scanf("%d", &id);
+
+                result = searchProduct(id);
+
+                displayProduct(result);
+
+                break;
+
+            case 3:
+
+                displayCache();
+
+                break;
+
+            case 4:
+
+                displayStatistics();
+
+                break;
+
+            case 5:
+
+                printf("\nProgram closed successfully.\n");
+
+                break;
+
+            default:
+
+                printf("\nInvalid choice!\n");
+        }
+
+    } while (choice != 5);
+
+    return 0;
+}
